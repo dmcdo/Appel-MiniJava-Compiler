@@ -27,7 +27,7 @@ javacc:
 	$(JAVACC) -DEBUG_PARSER -OUTPUT_DIRECTORY=parser/ parser/parser.jj
 
 phase12.jar: clean
-	$(JAR) cvf $@ ./compile ./Makefile ./runtime.c ./Test.java ./README.txt ./assemble */*
+	$(JAR) cvf $@ ./compile ./Makefile ./runtime.c ./Test.java ./README.txt ./LICENSE ./assemble */*
 
 clean:
 	-/bin/rm -f Manifest
