@@ -10,4 +10,4 @@ $ make                        # Same as 'make assembler.'
 
 Usage:
 ./compile Test.java
-./assemble Test.java
+./assemble Test.s
