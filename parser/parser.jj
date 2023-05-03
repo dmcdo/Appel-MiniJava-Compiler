@@ -1,0 +1,576 @@
+PARSER_BEGIN(MiniParser)
+    package parser;
+    import syntax.*;
+    import java.util.List;
+    import java.util.ArrayList;
+    import java.util.function.Function;
+    public class MiniParser {
+        public static Function<ParseException, Boolean> onException;
+    }
+PARSER_END(MiniParser)
+
+JAVACODE
+void exception(ParseException ex, int recoveryToken) {
+    if (MiniParser.onException == null || !MiniParser.onException.apply(ex))
+        throw ex;
+
+    Token t;
+    do {
+        t = MiniParser.getNextToken();
+    } while (t.kind != EOF && t.kind != recoveryToken);
+}
+
+TOKEN : {
+      < #DIGIT_NONZERO: ["1"-"9"] >
+    | < #DIGIT:         ("0" | <DIGIT_NONZERO>) >
+    | < #LETTER:        ["a"-"z"] | ["A"-"Z"] >
+
+    | < ABSTRACT: "abstract" >
+    | < ASSERT: "assert" >
+    | < BOOLEAN: "boolean" >
+    | < BREAK: "break" >
+    | < BYTE: "byte" >
+    | < CASE: "case" >
+    | < CATCH: "catch" >
+    | < CHAR: "char" >
+    | < CLASS: "class" >
+    | < CONTINUE: "continue" >
+    | < CONST: "const" >
+    | < DEFAULTCASE: "default" >
+    | < DO: "do" >
+    | < DOUBLE: "double" >
+    | < ELSE: "else" >
+    | < ENUM: "enum" >
+    | < EXPORTS: "exports" >
+    | < EXTENDS: "extends" >
+    | < FINAL: "final" >
+    | < FINALLY: "finally" >
+    | < FLOAT: "float" >
+    | < FOR: "for" >
+    | < GOTO: "goto" >
+    | < IF: "if" >
+    | < IMPLEMENTS: "implements" >
+    | < IMPORT: "import" >
+    | < INSTANCEOF: "instanceof" >
+    | < INT: "int" >
+    | < INTERFACE: "interface" >
+    | < LONG: "long" >
+    | < MODULE: "module" >
+    | < NATIVE: "native" >
+    | < NEW: "new" >
+    | < PACKAGE: "package" >
+    | < PRIVATE: "private" >
+    | < PROTECTED: "protected" >
+    | < PUBLIC: "public" >
+    | < RECORD: "record" >
+    | < REQUIRES: "requires" >
+    | < RETURN: "return" >
+    | < SHORT: "short" >
+    | < STATIC: "static" >
+    | < STRICTFP: "strictfp" >
+    | < SUPER: "super" >
+    | < SWITCH: "switch" >
+    | < SYNCHRONIZED: "synchronized" >
+    | < THIS: "this" >
+    | < THROW: "throw" >
+    | < THROWS: "throws" >
+    | < TRANSIENT: "transient" >
+    | < TRY: "try" >
+    | < VAR: "var" >
+    | < VOID: "void" >
+    | < VOLATILE: "volatile" >
+    | < WHILE: "while" >
+
+    | < SYSTEM_OUT_PRINTLN: "System.out.println" >
+    | < LENGTH: "length" >
+    | < MAIN: "main" >
+    | < STRING: "String" >
+
+    | < PLUS: "+" >
+    | < MINUS: "-" >
+    | < ASTERISK: "*" >
+    | < DIVIDE: "/" >
+    | < MODULUS: "%" >
+    | < INCREMENT: "++" >
+    | < DECREMENT: "--" >
+    | < LOGICAL_NOT: "!" >
+    | < ASSIGN: "=" >
+    | < EQ: "==" >
+    | < NE: "!=" >
+    | < GT: ">" >
+    | < LT: "<" >
+    | < GE: ">=" >
+    | < LE: "<=" >
+    | < LOGICAL_AND: "&&" >
+    | < LOGICAL_OR: "||" >
+    | < LBRACKET: "[" >
+    | < RBRACKET: "]" >
+    | < LPAREN: "(" >
+    | < RPAREN: ")" >
+    | < LCURLY: "{" >
+    | < RCURLY: "}" >
+    | < SEMICOLON: ";" >
+    | < COMMA: "," >
+    | < DOT: "." >
+    | < QUESTIONMARK: "?" >
+    | < COLON: ":" >
+
+    | < TRUE: "true" >
+    | < FALSE: "false" >
+    | < NULL: "null" >
+    | < DECIMALINT: "0" | <DIGIT_NONZERO> (<DIGIT>)* >
+    | < REAL: (<DIGIT>)+ "." (<DIGIT>)* >
+
+    | < IDENTIFIER: <LETTER> (<LETTER> | <DIGIT> | "_")* >
+
+    | < ILLEGAL: ~[" ", "\t", "\n", "\b", "\f", "\r"] >
+}
+
+SKIP: {
+      < "//" (~["\n"])* "\n" >
+    | < "/*" ((~["*"])* ("*")* (~["*", "/"])+)* ("/")* ("*")+ "/" >
+    | " "
+    | "\t"
+    | "\n"
+    | "\b"
+    | "\f"
+    | "\r"
+}
+
+Program Program() :
+{
+    MainClass m;
+    List<ClassDecl> l = new ArrayList<ClassDecl>();
+}
+{
+    try {
+        m = MainClass() (ClassDecl(l) /* | RecordDeclaration(l) */)* <EOF>
+        { return new Program(m, l); }
+    }
+    catch (ParseException ex) {
+        exception(ex, EOF);
+    }
+
+    { return null; }
+}
+
+MainClass MainClass() :
+{
+    Token t;
+    Identifier classname;
+    Identifier argsname;
+    Statement statement = null;
+    List<Statement> l = new ArrayList<Statement>();
+}
+{
+    t = <CLASS> classname = Identifier() <LCURLY>
+            <PUBLIC> <STATIC> <VOID> <MAIN> <LPAREN> <STRING> <LBRACKET> <RBRACKET> argsname = Identifier() <RPAREN> <LCURLY>
+                statement = Statement()
+            <RCURLY>
+    <RCURLY>
+
+    { return new MainClass(t.beginLine, t.beginColumn, classname, argsname, statement); }
+}
+
+void ClassDecl(List<ClassDecl> parent) :
+{
+    Token t;
+    Identifier i;
+    Identifier e = null;
+    List<FieldDecl> v = new ArrayList<FieldDecl>();
+    List<MethodDecl> m = new ArrayList<MethodDecl>();
+}
+{
+    t = <CLASS> i = Identifier() (<EXTENDS> e = Identifier())? <LCURLY>
+        (FieldDecl(v))*
+        (MethodDecl(m))*
+    <RCURLY>
+
+    {
+        if (e == null)
+            parent.add(new SimpleClassDecl(i, v, m));
+        else
+            parent.add(new ExtendingClassDecl(i, e, v, m));
+    }
+}
+
+// void RecordDecl() : {}
+// {
+//     <RECORD> <IDENTIFIER> <LPAREN> (Arguments())? <RPAREN> <LCURLY> <RCURLY>
+// }
+
+void FieldDecl(List<FieldDecl> parent) :
+{
+    Type t;
+    Identifier i;
+}
+{
+    try {
+        t = Type() i = Identifier() <SEMICOLON>
+        { parent.add(new FieldDecl(t, i)); }
+    }
+    catch (ParseException ex) {
+        exception(ex, SEMICOLON);
+    }
+}
+
+void LocalDecl(List<LocalDecl> parent) :
+{
+    Type t;
+    Identifier i;
+}
+{
+    try {
+        t = Type() i = Identifier() <SEMICOLON>
+        { parent.add(new LocalDecl(t, i)); }
+    }
+    catch (ParseException ex) {
+        exception(ex, SEMICOLON);
+    }
+}
+
+void MethodDecl(List<MethodDecl> parent) :
+{
+    Type t;
+    Identifier i;
+    List<FormalDecl> f = new ArrayList<FormalDecl>();
+    List<LocalDecl> l = new ArrayList<LocalDecl>();
+    List<Statement> sl = new ArrayList<Statement>();
+    Statement s;
+    Expression r;
+}
+{
+    <PUBLIC> t = Type() i = Identifier() <LPAREN> (Arguments(f))? <RPAREN> <LCURLY>
+        (LOOKAHEAD(2) LocalDecl(l))*
+        (
+            s = Statement()
+            {
+                if (s != null)
+                    sl.add(s);
+
+                s = null;
+            }
+        )*
+        <RETURN> r = Expression() <SEMICOLON>
+    <RCURLY>
+
+    { parent.add(new MethodDecl(t, i, f, l, sl, r)); }
+}
+
+void Arguments(List<FormalDecl> ret) :
+{
+    Type t;
+    Identifier i;
+}
+{
+    t = Type()
+    i = Identifier()
+    { ret.add(new FormalDecl(t, i)); }
+
+    (
+        <COMMA> t = Type() i = Identifier()
+        { ret.add(new FormalDecl(t, i)); }
+    )*
+}
+
+void Parameters(List<Expression> ret) : { Expression e; }
+{
+    e = Expression()
+    { ret.add(e); }
+
+    (
+        <COMMA> e = Expression()
+        { ret.add(e); }
+    )*
+}
+
+Type Type() : { Type ret; Token t; }
+{
+    (
+        LOOKAHEAD(2)
+
+          ( <INT> ((<LBRACKET> <RBRACKET>) { return Type.THE_INT_ARRAY_TYPE; } )? { return Type.THE_INTEGER_TYPE; } )
+        | ( <BOOLEAN>        { return Type.THE_BOOLEAN_TYPE;   } )
+        | ( t = <IDENTIFIER> { return new IdentifierType(t.beginLine, t.beginColumn, t.image); } )
+    )
+}
+
+Statement Statement() :
+{
+    Statement s = null;
+}
+{
+    try {
+          s = Block()
+        | s = If()
+        | s = While()
+        | s = Print()
+        | (LOOKAHEAD(2) s = Assign() | s = ArrayAssign())
+    }
+    catch (ParseException ex) {
+        exception(ex, SEMICOLON);
+    }
+
+    { return s; }
+}
+
+Block Block() :
+{
+    Statement s;
+    List<Statement> sl = new ArrayList<Statement>();
+}
+{
+    <LCURLY>
+    (
+        s = Statement()
+        {
+            if (s != null)
+                sl.add(s);
+
+            s = null;
+        }
+    )*
+    <RCURLY>
+
+    { return new Block(sl); }
+}
+
+If If() :
+{
+    Token t;
+    Expression cond;
+    Statement s1 = null;
+    Statement s2 = null;
+}
+{
+    t = <IF> <LPAREN> cond = Expression() <RPAREN>
+        s1 = Statement()
+    <ELSE>
+        s2 = Statement()
+
+    { return new If(t.beginLine, t.beginColumn, cond, s1, s2); }
+}
+
+While While() :
+{
+    Token t;
+    Expression cond;
+    Statement s;
+}
+{
+    t = <WHILE> <LPAREN> cond = Expression() <RPAREN>
+        s = Statement()
+
+    { return new While(t.beginLine, t.beginColumn, cond, s); }
+}
+
+Print Print() :
+{
+    Token t;
+    Expression e;
+}
+{
+    t = <SYSTEM_OUT_PRINTLN> <LPAREN> e = Expression() <RPAREN> <SEMICOLON>
+    { return new Print(t.beginLine, t.beginColumn, e); }
+}
+
+Assign Assign() :
+{
+    Identifier i;
+    Expression e;
+}
+{
+    i = Identifier() <ASSIGN> e = Expression() <SEMICOLON>
+    { return new Assign(i.lineNumber, i.columnNumber, i, e); }
+}
+
+ArrayAssign ArrayAssign() :
+{
+    Identifier i;
+    Expression b;
+    Expression e;
+}
+{
+    i = Identifier() <LBRACKET> b = Expression() <RBRACKET> <ASSIGN> e = Expression() <SEMICOLON>
+    { return new ArrayAssign(i.lineNumber, i.columnNumber, i, b, e); }
+}
+
+Expression Expression() : { Expression e; }
+{
+    e = Expression4()
+    { return e; }
+}
+
+Expression Expression4() : {
+    Expression e;
+    Expression f;
+}
+{
+    e = Expression9()
+    (
+        <LOGICAL_AND> f = Expression9()
+        { e = new And(e.lineNumber, e.columnNumber, e, f); }
+    )*
+
+    { return e; }
+}
+
+Expression Expression9() :
+{
+    Expression e;
+    Expression f;
+}
+{
+    e = Expression11()
+    (
+        <LT> f = Expression11()
+        { e = new LessThan(e.lineNumber, e.columnNumber, e, f); }
+    )*
+
+    { return e; }
+}
+
+Expression Expression11() :
+{
+    Expression e;
+    Expression f;
+    Token t;
+}
+{
+    e = Expression12()
+    (
+        (t = <PLUS> | t = <MINUS>) f = Expression12() 
+        {
+            if (t.kind == PLUS)
+                e = new Plus(e.lineNumber, e.columnNumber, e, f);
+            else
+                e = new Minus(e.lineNumber, e.columnNumber, e, f);
+
+        }
+    )*
+
+    {
+        return e;
+    }
+}
+
+Expression Expression12() :
+{
+    Expression e;
+    Expression f;
+}
+{
+    e = Expression13()
+    (
+        <ASTERISK> f = Expression13()
+        { e = new Times(e.lineNumber, e.columnNumber, e, f); }
+    )*
+
+    { return e; }
+}
+
+Expression Expression13() :
+{ 
+    Token t;
+    Expression e;
+}
+{
+      (e = Expression15()   { return e; })
+    | (t = <LOGICAL_NOT> e = Expression13() { return new Not(t.beginLine, t.beginColumn, e); })
+}
+
+Expression Expression15() :
+{
+    Expression x;
+    List<Expression> l = new ArrayList<Expression>();
+}
+{
+    x = ExpressionInfinity()
+    (
+          x = ArrayLookup(x)
+        | (LOOKAHEAD(2) x = ArrayLength(x) | x = Call(x))
+    )*
+
+    { return x; }
+}
+
+ArrayLookup ArrayLookup(Expression x) : { Expression e; Token t; }
+{
+    t = <LBRACKET> e = Expression() <RBRACKET>
+    { return new ArrayLookup(x.lineNumber, x.columnNumber, x, e); }
+}
+
+ArrayLength ArrayLength(Expression x) : { Expression e; }
+{
+    <DOT> <LENGTH>
+    { return new ArrayLength(x.lineNumber, x.columnNumber, x); }
+}
+
+Call Call(Expression x) : {
+    Identifier i;
+    List<Expression> params = new ArrayList<Expression>();
+}
+{
+    <DOT> i = Identifier() <LPAREN> (Parameters(params))? <RPAREN>
+    { return new Call(x.lineNumber, x.columnNumber, x, i, params); }
+}
+
+Expression ExpressionInfinity() : { Expression e; }
+{
+      e = IdentifierExp()                               { return e; }
+    | e = True()                                        { return e; }
+    | e = False()                                       { return e; }
+    | e = This()                                        { return e; }
+    | e = IntegerLiteral()                              { return e; }
+    | ( <LPAREN> e = Expression() <RPAREN> )            { return e; }
+    | ( LOOKAHEAD(2) e = NewObject() | e = NewArray() ) { return e; }
+}
+
+NewObject NewObject() : { Token t; Identifier i; }
+{
+    t = <NEW> i = Identifier() <LPAREN> <RPAREN>
+    { return new NewObject(t.beginLine, t.beginColumn, i); }
+}
+
+NewArray NewArray() : { Token t; Expression e; }
+{
+    t = <NEW> <INT> <LBRACKET> e = Expression() <RBRACKET>
+    { return new NewArray(t.beginLine, t.beginColumn, e); }
+}
+
+This This() : { Token t; }
+{
+    t = <THIS>
+    { return new This(t.beginLine, t.beginColumn); }
+}
+
+Identifier Identifier() : { Token t; }
+{
+    t = <IDENTIFIER>
+    { return new Identifier(t.beginLine, t.beginColumn, t.image); }
+}
+
+IdentifierExp IdentifierExp() : { Token t; }
+{
+    t = <IDENTIFIER>
+    { return new IdentifierExp(t.beginLine, t.beginColumn, t.image); }
+}
+
+IntegerLiteral IntegerLiteral() : { Token t; }
+{
+    t = <DECIMALINT>
+    { return new IntegerLiteral(t.beginLine, t.beginColumn, Integer.parseInt(t.image)); }
+}
+
+True True() : { Token t; }
+{
+    t = <TRUE>
+    { return new True(t.beginLine, t.beginColumn); }
+}
+
+False False() : { Token t; }
+{
+    t = <FALSE>
+    { return new False(t.beginLine, t.beginColumn); }
+}
+
