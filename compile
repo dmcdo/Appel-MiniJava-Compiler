@@ -1,2 +1,2 @@
 #!/bin/sh
-java -XX:MaxJavaStackTraceDepth=50 -jar translate.jar $*
+java -XX:MaxJavaStackTraceDepth=50 -jar compile.jar $*
