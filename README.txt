@@ -11,3 +11,5 @@ $ make                        # Same as 'make assembler.'
 Usage:
 ./compile Test.java
 ./assemble Test.s
+
+# thank you for investing your time in this
